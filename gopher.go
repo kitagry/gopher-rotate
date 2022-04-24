@@ -2,7 +2,9 @@ package gopherrotate
 
 import (
 	"bytes"
+	_ "embed"
 	"image"
+	"image/color"
 	_ "image/png"
 	"log"
 	"math"
@@ -10,19 +12,33 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	rmascot "github.com/hajimehoshi/ebiten/v2/examples/resources/images/mascot"
+	"github.com/hajimehoshi/ebiten/v2/text"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 )
 
 const (
-	width  = 200
-	height = 200
+	width  = 240
+	height = 280
+
+	imgWidth  = 200
+	imgHeight = 200
 )
 
 var (
 	gopher1 *ebiten.Image
 	gopher2 *ebiten.Image
 	gopher3 *ebiten.Image
+
+	fukidashi *ebiten.Image
+
+	mplusNormalFont font.Face
 )
+
+//go:embed assets/fukidashi.png
+var fukidashiPng []byte
 
 func init() {
 	// Decode an image from the image file's byte slice.
@@ -46,6 +62,26 @@ func init() {
 		log.Fatal(err)
 	}
 	gopher3 = ebiten.NewImageFromImage(img3)
+
+	img4, _, err := image.Decode(bytes.NewReader(fukidashiPng))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fukidashi = ebiten.NewImageFromImage(img4)
+
+	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    24,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func init() {
@@ -96,6 +132,12 @@ type Mascot struct {
 	ground  int
 	count   int
 	reverse bool
+
+	msg string
+}
+
+func (m *Mascot) Say(msg string) {
+	m.msg = msg
 }
 
 func NewMascot() *Mascot {
@@ -189,17 +231,40 @@ func (m *Mascot) Draw(screen *ebiten.Image) {
 	tx := math.Abs(float64(w)/2*math.Sin(theta) + float64(h)/2*math.Cos(theta))
 	ty := math.Abs(float64(w)/2*math.Cos(theta) + float64(h)/2*math.Sin(theta))
 	op.GeoM.Translate(tx, ty)
+	switch m.ground % 4 {
+	case 0:
+		op.GeoM.Translate(0, height-imgHeight)
+	case 1:
+		op.GeoM.Translate(width-imgWidth, 0)
+	}
 
 	if m.reverse {
 		if m.ground%2 == 0 {
 			op.GeoM.Scale(-1, 1)
-			op.GeoM.Translate(width, 0)
+			op.GeoM.Translate(imgWidth, 0)
 		} else if m.ground%2 == 1 {
 			op.GeoM.Scale(1, -1)
-			op.GeoM.Translate(0, height)
+			op.GeoM.Translate(0, imgHeight)
 		}
 	}
 	screen.DrawImage(img, op)
+
+	if m.msg != "" {
+		fukidashiOp := &ebiten.DrawImageOptions{}
+		switch m.ground % 4 {
+		case 0:
+			fukidashiOp.GeoM.Translate(float64(w)*3/5, float64(h))
+		case 1:
+			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h))
+		case 2:
+			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h)*5/4)
+		case 3:
+			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h))
+		}
+		fukidashiOp.GeoM.Scale(0.8, 0.8)
+		screen.DrawImage(fukidashi, fukidashiOp)
+		text.Draw(fukidashi, m.msg, mplusNormalFont, 40, height-220, color.Black)
+	}
 }
 
 func (m *Mascot) Run() error {
