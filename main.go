@@ -52,14 +52,41 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type mascot struct {
+type horizonMascot struct {
 	x16  int
 	y16  int
 	vx16 int
 	vy16 int
+}
 
-	ground int
-	count  int
+func (h *horizonMascot) Update() error {
+	if h.vx16 == 0 && h.x16 == 0 {
+		h.vx16 = 64
+	}
+	h.x16 += h.vx16
+
+	// If the mascto is on the ground, cause an action in random.
+	if rand.Intn(60) == 0 {
+		switch rand.Intn(2) {
+		// case 0:
+		// 	// Jump.
+		// 	m.vy16 = -240
+		case 1:
+			// Turn.
+			h.vx16 = -h.vx16
+		}
+	}
+	return nil
+}
+
+type mascot struct {
+	h   *horizonMascot
+	x16 int
+	y16 int
+
+	ground  int
+	count   int
+	reverse bool
 }
 
 func (m *mascot) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -68,65 +95,63 @@ func (m *mascot) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func (m *mascot) Update() error {
 	m.count++
+	err := m.h.Update()
+	if err != nil {
+		return err
+	}
 
 	sw, sh := ebiten.ScreenSizeInFullscreen()
 	ebiten.SetWindowPosition(m.x16/16, m.y16/16+sh-height)
 
-	if m.vx16 == 0 && m.x16 == 0 {
-		m.vx16 = 64
+	m.reverse = m.h.vx16 < 0
+
+	ground := 0
+	x16 := m.h.x16
+	if x16 > 0 {
+		for {
+			if ground%2 == 0 && x16/16 > sw-width {
+				ground++
+				x16 -= (sw - width) * 16
+			} else if ground%2 == 1 && x16/16 > sh-height {
+				ground++
+				x16 -= (sh - height) * 16
+			} else {
+				break
+			}
+		}
+	} else {
+		for {
+			if ground < 0 {
+				ground += 4
+			}
+			if ground%2 == 0 && x16/16 < 0 {
+				ground--
+				x16 += (sh - height) * 16
+			} else if ground%2 == 1 && x16/16 < 0 {
+				ground--
+				x16 += (sw - width) * 16
+			} else {
+				break
+			}
+		}
 	}
-	m.x16 += m.vx16
-	// if m.x16/16 > sw-width && m.vx16 > 0 {
-	// 	m.vx16 = -64
-	// }
-	// if m.x16 <= 0 && m.vx16 < 0 {
-	// 	m.vx16 = 64
-	// }
-
-	// Accelarate the mascot in the Y direction.
-	// m.vy16 += 8
-	m.y16 += m.vy16
-
-	// If the mascot is on the ground, stop it in the Y direction.
-	// if m.y16 >= 0 {
-	// 	m.y16 = 0
-	// 	m.vy16 = 0
-	// }
+	m.ground = ground
 
 	switch m.ground % 4 {
 	case 0:
-		if m.x16/16 > sw-width && m.vx16 > 0 {
-			m.ground++
-			m.vx16, m.vy16 = m.vy16, -m.vx16
-		}
+		m.x16 = x16
+		m.y16 = m.h.y16
 	case 1:
-		if -m.y16/16 > sh-height && m.vy16 < 0 {
-			m.ground++
-			m.vx16, m.vy16 = m.vy16, m.vx16
-		}
+		m.x16 = (sw-width)*16 - m.h.y16
+		m.y16 = -x16
 	case 2:
-		if m.x16/16 < 0 && m.vx16 < 0 {
-			m.ground++
-			m.vx16, m.vy16 = m.vy16, -m.vx16
-		}
+		m.x16 = (sw-width)*16 - x16
+		m.y16 = -(sh-height)*16 + m.h.y16
 	case 3:
-		if m.y16/16 > 0 && m.vy16 > 0 {
-			m.ground++
-			m.vx16, m.vy16 = m.vy16, m.vx16
-		}
+		m.x16 = m.h.y16
+		m.y16 = -(sh-height)*16 + x16
 	}
 
-	// If the mascto is on the ground, cause an action in random.
-	// if rand.Intn(60) == 0 && m.y16 == 0 {
-	// 	switch rand.Intn(2) {
-	// 	case 0:
-	// 		// Jump.
-	// 		m.vy16 = -240
-	// 	case 1:
-	// 		// Turn.
-	// 		m.vx16 = -m.vx16
-	// 	}
-	// }
 	return nil
 }
 
@@ -140,6 +165,7 @@ func (m *mascot) Draw(screen *ebiten.Image) {
 	case 2:
 		img = gopher3
 	}
+
 	op := &ebiten.DrawImageOptions{}
 	w, h := img.Size()
 	theta := -float64(m.ground) * 90 * math.Pi * 2 / 360
@@ -148,10 +174,15 @@ func (m *mascot) Draw(screen *ebiten.Image) {
 	tx := math.Abs(float64(w)/2*math.Sin(theta) + float64(h)/2*math.Cos(theta))
 	ty := math.Abs(float64(w)/2*math.Cos(theta) + float64(h)/2*math.Sin(theta))
 	op.GeoM.Translate(tx, ty)
-	// op.GeoM.Translate(float64(h)/2, float64(w)/2)
-	if m.vx16 < 0 {
-		op.GeoM.Scale(-1, 1)
-		op.GeoM.Translate(width, 0)
+
+	if m.reverse {
+		if m.ground%2 == 0 {
+			op.GeoM.Scale(-1, 1)
+			op.GeoM.Translate(width, 0)
+		} else if m.ground%2 == 1 {
+			op.GeoM.Scale(1, -1)
+			op.GeoM.Translate(0, height)
+		}
 	}
 	screen.DrawImage(img, op)
 }
@@ -161,7 +192,7 @@ func main() {
 	ebiten.SetWindowDecorated(false)
 	ebiten.SetWindowFloating(true)
 	ebiten.SetWindowSize(width, height)
-	if err := ebiten.RunGame(&mascot{}); err != nil {
+	if err := ebiten.RunGame(&mascot{h: &horizonMascot{}}); err != nil {
 		log.Fatal(err)
 	}
 }
