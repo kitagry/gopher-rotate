@@ -65,12 +65,21 @@ func (h *horizonMascot) Update() error {
 	}
 	h.x16 += h.vx16
 
+	h.y16 += h.vy16
+	h.vy16 -= 8
+
+	if h.y16 < 0 {
+		h.y16 = 0
+	}
+
 	// If the mascto is on the ground, cause an action in random.
 	if rand.Intn(60) == 0 {
 		switch rand.Intn(2) {
-		// case 0:
-		// 	// Jump.
-		// 	m.vy16 = -240
+		case 0:
+			// Jump.
+			if h.y16 == 0 {
+				// h.vy16 = 240
+			}
 		case 1:
 			// Turn.
 			h.vx16 = -h.vx16
