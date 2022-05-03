@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	width  = 240
+	width  = 280
 	height = 280
 
 	imgWidth  = 200
@@ -255,7 +255,7 @@ func (m *Mascot) Draw(screen *ebiten.Image) {
 		case 0:
 			fukidashiOp.GeoM.Translate(float64(w)*3/5, float64(h))
 		case 1:
-			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h))
+			fukidashiOp.GeoM.Translate(float64(w)*3/5, float64(h))
 		case 2:
 			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h)*5/4)
 		case 3:
