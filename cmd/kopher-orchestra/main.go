@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -56,6 +57,7 @@ func main() {
 			}
 
 			cmd := exec.CommandContext(ctx, "kopher", podName)
+			cmd.Stdout = os.Stdout
 			err := cmd.Start()
 			if err != nil {
 				fmt.Printf("failed to run command: %v\n", err)

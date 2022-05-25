@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -20,8 +21,8 @@ import (
 )
 
 const (
-	width  = 280
-	height = 280
+	width  = 300
+	height = 300
 
 	imgWidth  = 200
 	imgHeight = 200
@@ -250,6 +251,8 @@ func (m *Mascot) Draw(screen *ebiten.Image) {
 	screen.DrawImage(img, op)
 
 	if m.msg != "" {
+		commentW, commentH := fukidashi.Size()
+		commentImg := ebiten.NewImage(commentW, commentH)
 		fukidashiOp := &ebiten.DrawImageOptions{}
 		switch m.ground % 4 {
 		case 0:
@@ -262,8 +265,23 @@ func (m *Mascot) Draw(screen *ebiten.Image) {
 			fukidashiOp.GeoM.Translate(float64(w)/2, float64(h))
 		}
 		fukidashiOp.GeoM.Scale(0.8, 0.8)
-		screen.DrawImage(fukidashi, fukidashiOp)
-		text.Draw(fukidashi, m.msg, mplusNormalFont, 40, height-220, color.Black)
+		commentImg.DrawImage(fukidashi, &ebiten.DrawImageOptions{})
+		msg := strings.Trim(m.msg, "\n")
+		resultMsg := ""
+		for i := 0; i < 2; i++ {
+			index := strings.LastIndex(msg, "\n")
+			if index == -1 {
+				resultMsg = msg + resultMsg
+				break
+			}
+			resultMsg = msg[index:] + resultMsg
+			msg = msg[:index]
+		}
+		if len(resultMsg) > 0 && resultMsg[0] == '\n' {
+			resultMsg = resultMsg[1:]
+		}
+		text.Draw(commentImg, resultMsg, mplusNormalFont, 30, height-240, color.Black)
+		screen.DrawImage(commentImg, fukidashiOp)
 	}
 }
 
